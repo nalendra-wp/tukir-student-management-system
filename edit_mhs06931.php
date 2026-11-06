@@ -1,5 +1,5 @@
+
 <?php
-require 'config06931.php';
 session_start();
 
 if (!isset($_SESSION['admin06931'])) {
@@ -7,76 +7,128 @@ if (!isset($_SESSION['admin06931'])) {
     exit();
 }
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $nim = $_POST['Nim'];
-    $nama = $_POST['nama'];
-    $jenis_kelamin = $_POST['jenis_kelamin'];
-    $alamat = $_POST['alamat'];
-    $email = $_POST['email'];
-    $kota = $_POST['kota'];
-    $ipk = $_POST['ipk'];
+require_once 'config06931.php';
 
-    // Update data in database
-    $sql = "UPDATE mahasiswa06931 SET Nama=?, JenisKelamin=?, Alamat=?, Email=?, Kota=?, IPK=? WHERE Nim=?";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("sssssss", $nama, $jenis_kelamin, $alamat, $email, $kota, $ipk, $nim);
+$message = '';
+$nim = '';
 
-    if ($stmt->execute()) {
-        echo "<script>alert('Data berhasil diperbarui'); window.location.href = 'homeadmin06931.php';</script>";
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $nim = trim($_POST['Nim'] ?? '');
+    $nama = trim($_POST['nama'] ?? '');
+    $jenis_kelamin = $_POST['jenis_kelamin'] ?? '';
+    $alamat = trim($_POST['alamat'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $kota = trim($_POST['kota'] ?? '');
+    $ipk = $_POST['ipk'] ?? '';
+
+    if (
+        $nim === '' ||
+        $nama === '' ||
+        $alamat === '' ||
+        !filter_var($email, FILTER_VALIDATE_EMAIL) ||
+        !in_array($jenis_kelamin, ['Laki-laki', 'Perempuan'], true) ||
+        !is_numeric($ipk) ||
+        $ipk < 0 ||
+        $ipk > 4
+    ) {
+        $message = 'Please enter valid student information.';
     } else {
-        echo "<script>alert('Gagal memperbarui data'); window.location.href = 'edit_mhs06931.php?Nim=$nim';</script>";
-    }
+        $ipk = (float) $ipk;
 
+        $sql = "UPDATE mahasiswa06931
+                SET Nama = ?, JenisKelamin = ?, Alamat = ?,
+                    Email = ?, Kota = ?, IPK = ?
+                WHERE Nim = ?";
+
+        $stmt = $conn->prepare($sql);
+
+        if ($stmt) {
+            $stmt->bind_param(
+                "sssssds",
+                $nama,
+                $jenis_kelamin,
+                $alamat,
+                $email,
+                $kota,
+                $ipk,
+                $nim
+            );
+
+            if ($stmt->execute()) {
+                $message = 'Data berhasil diperbarui.';
+            } else {
+                $message = 'Gagal memperbarui data.';
+            }
+
+            $stmt->close();
+        } else {
+            $message = 'Unable to process the update.';
+        }
+    }
+} elseif (isset($_GET['Nim'])) {
+    $nim = trim($_GET['Nim']);
+} else {
+    header('Location: homeadmin06931.php');
+    exit();
+}
+
+// Ambil data mahasiswa
+$sql = "SELECT * FROM mahasiswa06931 WHERE Nim = ?";
+$stmt = $conn->prepare($sql);
+
+if (!$stmt) {
+    die('Unable to retrieve student data.');
+}
+
+$stmt->bind_param("s", $nim);
+$stmt->execute();
+$result = $stmt->get_result();
+
+if ($result->num_rows === 0) {
     $stmt->close();
     $conn->close();
-} else {
-    if (isset($_GET['Nim'])) {
-        $nim = $_GET['Nim'];
+    die('Record not found.');
+}
 
-        // Fetch data based on Nim
-        $sql = "SELECT * FROM mahasiswa06931 WHERE Nim = ?";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("s", $nim);
-        $stmt->execute();
-        $result = $stmt->get_result();
+$row = $result->fetch_assoc();
 
-        if ($result->num_rows === 0) {
-            echo "Record not found";
-            exit();
-        }
+$stmt->close();
+$conn->close();
 
-        $row = $result->fetch_assoc();
-
-        // Close statement and connection
-        $stmt->close();
-        $conn->close();
-    } else {
-        header('Location: homeadmin06931.php');
-        exit();
-    }
+function e($value) {
+    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Edit Mahasiswa</title>
+
     <style>
         * {
             font-family: Arial, Helvetica, sans-serif;
             box-sizing: border-box;
-            
         }
+
         body {
-            background-color: #f0f0f0; /* Warna latar belakang halaman */
-            background-image: url('https://images.pexels.com/photos/1103970/pexels-photo-1103970.jpeg?cs=srgb&dl=pexels-jplenio-1103970.jpg&fm=jpg'); /* Ganti dengan path gambar latar belakang Anda */
-            background-size: cover; /* Agar gambar latar belakang mengisi seluruh area body */
-            background-position: center; /* Posisikan gambar latar belakang ke tengah */
-            background-repeat: no-repeat; /* Agar gambar tidak diulang */
+            background-color: #f0f0f0;
+            background-image: url('https://images.pexels.com/photos/1103970/pexels-photo-1103970.jpeg?cs=srgb&dl=pexels-jplenio-1103970.jpg&fm=jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
             margin: 0;
             padding: 0;
         }
+
+        h2 {
+            text-align: center;
+            margin-top: 30px;
+        }
+
         form {
             max-width: 600px;
             margin: 20px auto;
@@ -84,7 +136,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             border: 1px solid #ddd;
             background-color: #f9f9f9;
             border-radius: 5px;
-            
         }
 
         label {
@@ -94,8 +145,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         input[type="text"],
         input[type="email"],
+        input[type="number"],
         select {
-            width: calc(100% - 20px);
+            width: 100%;
             padding: 8px;
             margin-bottom: 10px;
         }
@@ -114,60 +166,117 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             border: none;
             padding: 10px 20px;
             text-align: center;
-            text-decoration: none;
-            display: inline-block;
             font-size: 16px;
             border-radius: 5px;
             cursor: pointer;
         }
 
+        .submit-btn:hover {
+            background-color: #003580;
+        }
+
         .jeniskel {
             display: flex;
-            align-items: start;
-            
+            align-items: center;
+        }
+
+        .message {
+            max-width: 600px;
+            margin: 15px auto;
+            padding: 10px;
+            background-color: #fff;
+            border-radius: 5px;
+        }
+
+        .back-link {
+            display: block;
+            text-align: center;
+            margin: 20px;
         }
     </style>
 </head>
 
 <body>
+
     <h2>Edit Mahasiswa</h2>
+
+    <?php if ($message !== ''): ?>
+        <p class="message"><?= e($message); ?></p>
+    <?php endif; ?>
+
     <form action="edit_mhs06931.php" method="POST">
-        <input type="hidden" name="Nim" value="<?php echo $row['Nim']; ?>">
+
+        <input type="hidden" name="Nim" value="<?= e($row['Nim']); ?>">
+
         <label for="nim">NIM:</label>
-        <input type="text" id="nim" name="nim" value="<?php echo $row['Nim']; ?>" readonly>
-        
+        <input type="text" id="nim" value="<?= e($row['Nim']); ?>" readonly>
 
         <label for="nama">Nama:</label>
-        <input type="text" id="nama" name="nama" value="<?php echo $row['Nama']; ?>" required>
+        <input type="text" id="nama" name="nama"
+               value="<?= e($row['Nama']); ?>" required>
 
-        <label for="jenis_kelamin">Jenis Kelamin:</label>
+        <label>Jenis Kelamin:</label>
+
         <div class="jeniskel">
-            <input type="radio" id="laki_laki" name="jenis_kelamin" value="Laki-laki" <?php echo ($row['JenisKelamin'] == 'Laki-laki') ? 'checked' : ''; ?>>
-            <label class="radio-label" for="laki_laki">Laki-laki</label>
-            <input type="radio" id="perempuan" name="jenis_kelamin" value="Perempuan" <?php echo ($row['JenisKelamin'] == 'Perempuan') ? 'checked' : ''; ?>>
-            <label class="radio-label" for="perempuan">Perempuan</label>
+            <input type="radio" id="laki_laki"
+                   name="jenis_kelamin" value="Laki-laki"
+                   <?= $row['JenisKelamin'] === 'Laki-laki' ? 'checked' : ''; ?>
+                   required>
 
+            <label class="radio-label" for="laki_laki">Laki-laki</label>
+
+            <input type="radio" id="perempuan"
+                   name="jenis_kelamin" value="Perempuan"
+                   <?= $row['JenisKelamin'] === 'Perempuan' ? 'checked' : ''; ?>>
+
+            <label class="radio-label" for="perempuan">Perempuan</label>
         </div>
 
         <label for="alamat">Alamat:</label>
-        <input type="text" id="alamat" name="alamat" value="<?php echo $row['Alamat']; ?>" required>
+        <input type="text" id="alamat" name="alamat"
+               value="<?= e($row['Alamat']); ?>" required>
 
         <label for="email">Email:</label>
-        <input type="email" id="email" name="email" value="<?php echo $row['Email']; ?>" required>
+        <input type="email" id="email" name="email"
+               value="<?= e($row['Email']); ?>" required>
 
         <label for="kota">Kota:</label>
         <select id="kota" name="kota" required>
-            <option value="Semarang" <?php echo ($row['Kota'] == 'Semarang') ? 'selected' : ''; ?>>Semarang</option>
-            <option value="Jepara" <?php echo ($row['Kota'] == 'Jepara') ? 'selected' : ''; ?>>Jepara</option>
-            <option value="Salatiga" <?php echo ($row['Kota'] == 'Salatiga') ? 'selected' : ''; ?>>Salatiga</option>
-            <option value="Dll" <?php echo ($row['Kota'] == 'Dll') ? 'selected' : ''; ?>>Dll</option>
+            <?php
+            $cities = array_unique([
+                $row['Kota'],
+                'Semarang',
+                'Jepara',
+                'Salatiga',
+                'Surabaya',
+                'Jakarta',
+                'Bandung',
+                'Dll'
+            ]);
+
+            foreach ($cities as $city):
+            ?>
+                <option value="<?= e($city); ?>"
+                    <?= $row['Kota'] === $city ? 'selected' : ''; ?>>
+                    <?= e($city); ?>
+                </option>
+            <?php endforeach; ?>
         </select>
 
         <label for="ipk">IPK:</label>
-        <input type="text" id="ipk" name="ipk" value="<?php echo $row['IPK']; ?>" required>
+        <input type="number" id="ipk" name="ipk"
+               value="<?= e($row['IPK']); ?>"
+               min="0" max="4" step="0.01" required>
 
-        <button type="submit" class="submit-btn">Simpan Perubahan</button>
+        <button type="submit" class="submit-btn">
+            Simpan Perubahan
+        </button>
+
     </form>
-</body>
 
+    <a class="back-link" href="homeadmin06931.php">
+        Kembali ke Home Admin
+    </a>
+
+</body>
 </html>
