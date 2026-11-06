@@ -1,12 +1,12 @@
-
 <?php
 session_start();
-require_once 'config06931.php';
 
 if (!isset($_SESSION['admin06931'])) {
     header('Location: login06931.php');
     exit();
 }
+
+require_once 'config06931.php';
 
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -15,7 +15,12 @@ if (empty($_SESSION['csrf_token'])) {
 $sql = "SELECT * FROM mahasiswa06931";
 $result = $conn->query($sql);
 
-$ada = $result && $result->num_rows > 0;
+if (!$result) {
+    $conn->close();
+    die('Unable to retrieve student data.');
+}
+
+$ada = $result->num_rows > 0;
 ?>
 
 <!DOCTYPE html>
