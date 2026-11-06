@@ -1,0 +1,11 @@
+
+# Database credentials
+config06931.php
+.env
+
+# Dependencies
+/vendor/
+
+# System files
+.DS_Store
+Thumbs.db
