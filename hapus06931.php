@@ -1,5 +1,5 @@
+
 <?php
-require 'config06931.php';
 session_start();
 
 if (!isset($_SESSION['admin06931'])) {
@@ -7,24 +7,35 @@ if (!isset($_SESSION['admin06931'])) {
     exit();
 }
 
-if (isset($_GET['Nim'])) {
-    $nim = $_GET['Nim'];
+require_once 'config06931.php';
 
-    // Prepare the SQL delete statement
-    $sql = "DELETE FROM mahasiswa06931 WHERE Nim = ?";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("s", $nim);
-
-    if ($stmt->execute()) {
-        echo "<script>alert('Record deleted successfully'); window.location.href = 'homeadmin06931.php';</script>";
-    } else {
-        echo "<script>alert('Error deleting record'); window.location.href = 'homeadmin06931.php';</script>";
-    }
-
-    $stmt->close();
-    $conn->close();
-} else {
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: homeadmin06931.php');
     exit();
 }
-?>
+
+$nim = trim($_POST['Nim'] ?? '');
+$csrf_token = $_POST['csrf_token'] ?? '';
+
+if (
+    $nim === '' ||
+    !isset($_SESSION['csrf_token']) ||
+    !hash_equals($_SESSION['csrf_token'], $csrf_token)
+) {
+    header('Location: homeadmin06931.php');
+    exit();
+}
+
+$sql = "DELETE FROM mahasiswa06931 WHERE Nim = ?";
+$stmt = $conn->prepare($sql);
+
+if ($stmt) {
+    $stmt->bind_param("s", $nim);
+    $stmt->execute();
+    $stmt->close();
+}
+
+$conn->close();
+
+header('Location: homeadmin06931.php');
+exit();
