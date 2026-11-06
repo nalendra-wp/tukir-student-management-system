@@ -31,6 +31,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->close();
 
             if ($ada && validasi($password, $db_password)) {
+
+                // Upgrade hash MD5 lama ke password_hash()
+                if (preg_match('/^[a-f0-9]{32}$/i', $db_password)) {
+                    $new_hash = password_hash($password, PASSWORD_DEFAULT);
+
+                    $update_sql = "UPDATE admin06931 SET password = ? WHERE username = ?";
+                    $update_stmt = $conn->prepare($update_sql);
+
+                    if ($update_stmt) {
+                        $update_stmt->bind_param("ss", $new_hash, $username);
+                        $update_stmt->execute();
+                        $update_stmt->close();
+                    }
+                }
+
                 session_regenerate_id(true);
                 $_SESSION['admin06931'] = $username;
 
@@ -38,6 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 header('Location: homeadmin06931.php');
                 exit();
+
             } else {
                 $error = 'Invalid username or password.';
             }
@@ -144,6 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 id="username"
                 name="username"
                 maxlength="50"
+                autocomplete="username"
                 required
             >
 
@@ -152,6 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 type="password"
                 id="password"
                 name="password"
+                autocomplete="current-password"
                 required
             >
 
