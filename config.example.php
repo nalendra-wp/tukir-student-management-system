@@ -3,10 +3,13 @@
 $host = "localhost";
 $user = "root";
 $pass = "";
-$db   = "cool";
+$db = "cool";
 
-$conn = mysqli_connect($host, $user, $pass, $db);
+$conn = new mysqli($host, $user, $pass, $db);
 
-if (!$conn) {
+if ($conn->connect_error) {
     die("Database connection failed.");
 }
+
+$conn->set_charset("utf8mb4");
+?>
