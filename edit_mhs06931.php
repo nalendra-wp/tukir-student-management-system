@@ -12,6 +12,10 @@ require_once 'config06931.php';
 $message = '';
 $nim = '';
 
+function e($value) {
+    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nim = trim($_POST['Nim'] ?? '');
     $nama = trim($_POST['nama'] ?? '');
@@ -25,6 +29,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $nim === '' ||
         $nama === '' ||
         $alamat === '' ||
+        $kota === '' ||
+        strlen($nim) > 15 ||
+        strlen($nama) > 100 ||
+        strlen($alamat) > 255 ||
+        strlen($email) > 100 ||
+        strlen($kota) > 100 ||
         !filter_var($email, FILTER_VALIDATE_EMAIL) ||
         !in_array($jenis_kelamin, ['Laki-laki', 'Perempuan'], true) ||
         !is_numeric($ipk) ||
@@ -77,6 +87,7 @@ $sql = "SELECT * FROM mahasiswa06931 WHERE Nim = ?";
 $stmt = $conn->prepare($sql);
 
 if (!$stmt) {
+    $conn->close();
     die('Unable to retrieve student data.');
 }
 
@@ -84,20 +95,16 @@ $stmt->bind_param("s", $nim);
 $stmt->execute();
 $result = $stmt->get_result();
 
-if ($result->num_rows === 0) {
+if (!$result || $result->num_rows === 0) {
     $stmt->close();
     $conn->close();
-    die('Record not found.');
+    die('Student record not found.');
 }
 
 $row = $result->fetch_assoc();
 
 $stmt->close();
 $conn->close();
-
-function e($value) {
-    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
-}
 ?>
 
 <!DOCTYPE html>
@@ -213,6 +220,7 @@ function e($value) {
 
         <label for="nama">Nama:</label>
         <input type="text" id="nama" name="nama"
+               maxlength="100"
                value="<?= e($row['Nama']); ?>" required>
 
         <label>Jenis Kelamin:</label>
@@ -234,10 +242,12 @@ function e($value) {
 
         <label for="alamat">Alamat:</label>
         <input type="text" id="alamat" name="alamat"
+               maxlength="255"
                value="<?= e($row['Alamat']); ?>" required>
 
         <label for="email">Email:</label>
         <input type="email" id="email" name="email"
+               maxlength="100"
                value="<?= e($row['Email']); ?>" required>
 
         <label for="kota">Kota:</label>
