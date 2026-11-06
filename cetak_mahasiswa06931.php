@@ -1,22 +1,30 @@
 
+
 <?php
 session_start();
-require_once 'config06931.php';
 
 if (!isset($_SESSION['admin06931'])) {
     header('Location: login06931.php');
     exit();
 }
 
+require_once 'config06931.php';
+
 $sql = "SELECT * FROM mahasiswa06931 ORDER BY Nim ASC";
 $result = $conn->query($sql);
 
-$ada = $result && $result->num_rows > 0;
+if (!$result) {
+    $conn->close();
+    die('Unable to retrieve student data.');
+}
+
+$ada = $result->num_rows > 0;
 
 function e($value) {
-    return htmlspecialchars($value ?? '', ENT_QUOTES, 'UTF-8');
+    return htmlspecialchars((string) ($value ?? ''), ENT_QUOTES, 'UTF-8');
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
