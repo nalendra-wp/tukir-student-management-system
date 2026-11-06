@@ -1,89 +1,105 @@
 
 <?php
 session_start();
-require_once 'config06931.php';
 
 if (!isset($_SESSION['admin06931'])) {
     header('Location: login06931.php');
     exit();
 }
 
+require_once 'config06931.php';
+
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 $nim = $nama = $jenisKelamin = $alamat = $email = $kota = $ipk = '';
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $nim = trim($_POST['nim'] ?? '');
-    $nama = trim($_POST['nama'] ?? '');
-    $jenisKelamin = $_POST['jenis_kelamin'] ?? '';
-    $alamat = trim($_POST['alamat'] ?? '');
-    $email = trim($_POST['email'] ?? '');
-    $kota = trim($_POST['kota'] ?? '');
-    $ipk = trim($_POST['ipk'] ?? '');
+    $csrf_token = $_POST['csrf_token'] ?? '';
 
     if (
-        $nim === '' || $nama === '' || $jenisKelamin === '' ||
-        $alamat === '' || $email === '' || $kota === '' || $ipk === ''
+        !isset($_SESSION['csrf_token']) ||
+        !hash_equals($_SESSION['csrf_token'], $csrf_token)
     ) {
-        $error = 'Semua kolom wajib diisi.';
-    } elseif (!in_array($jenisKelamin, ['Laki-laki', 'Perempuan'], true)) {
-        $error = 'Jenis kelamin tidak valid.';
-    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = 'Format email tidak valid.';
-    } elseif (!is_numeric($ipk) || (float)$ipk < 0 || (float)$ipk > 4) {
-        $error = 'IPK harus berupa angka antara 0.00 sampai 4.00.';
-    } elseif (strlen($nim) > 15 || strlen($nama) > 100) {
-        $error = 'NIM atau nama melebihi batas karakter.';
-    } elseif (
-        strlen($alamat) > 255 ||
-        strlen($email) > 100 ||
-        strlen($kota) > 100
-    ) {
-        $error = 'Alamat, email, atau kota melebihi batas karakter.';
+        $error = 'Invalid request. Please refresh the page and try again.';
     } else {
-        $sql = "INSERT INTO mahasiswa06931
-                (Nim, Nama, JenisKelamin, Alamat, Email, Kota, IPK)
-                VALUES (?, ?, ?, ?, ?, ?, ?)";
+        $nim = trim($_POST['nim'] ?? '');
+        $nama = trim($_POST['nama'] ?? '');
+        $jenisKelamin = $_POST['jenis_kelamin'] ?? '';
+        $alamat = trim($_POST['alamat'] ?? '');
+        $email = trim($_POST['email'] ?? '');
+        $kota = trim($_POST['kota'] ?? '');
+        $ipk = trim($_POST['ipk'] ?? '');
 
-        $stmt = $conn->prepare($sql);
-
-        if ($stmt) {
-            $ipkValue = (float)$ipk;
-            $stmt->bind_param(
-                "ssssssd",
-                $nim,
-                $nama,
-                $jenisKelamin,
-                $alamat,
-                $email,
-                $kota,
-                $ipkValue
-            );
-
-            if ($stmt->execute()) {
-                $stmt->close();
-                $conn->close();
-
-                header('Location: homeadmin06931.php');
-                exit();
-            } else {
-                if ($stmt->errno === 1062) {
-                    $error = 'NIM sudah terdaftar.';
-                } else {
-                    $error = 'Gagal menambahkan data mahasiswa.';
-                }
-            }
-
-            $stmt->close();
+        if (
+            $nim === '' || $nama === '' || $jenisKelamin === '' ||
+            $alamat === '' || $email === '' || $kota === '' || $ipk === ''
+        ) {
+            $error = 'Semua kolom wajib diisi.';
+        } elseif (!in_array($jenisKelamin, ['Laki-laki', 'Perempuan'], true)) {
+            $error = 'Jenis kelamin tidak valid.';
+        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $error = 'Format email tidak valid.';
+        } elseif (!is_numeric($ipk) || (float)$ipk < 0 || (float)$ipk > 4) {
+            $error = 'IPK harus berupa angka antara 0.00 sampai 4.00.';
+        } elseif (strlen($nim) > 15 || strlen($nama) > 100) {
+            $error = 'NIM atau nama melebihi batas karakter.';
+        } elseif (
+            strlen($alamat) > 255 ||
+            strlen($email) > 100 ||
+            strlen($kota) > 100
+        ) {
+            $error = 'Alamat, email, atau kota melebihi batas karakter.';
         } else {
-            $error = 'Tidak dapat memproses data. Silakan coba lagi.';
+            $sql = "INSERT INTO mahasiswa06931
+                    (Nim, Nama, JenisKelamin, Alamat, Email, Kota, IPK)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)";
+
+            $stmt = $conn->prepare($sql);
+
+            if ($stmt) {
+                $ipkValue = (float)$ipk;
+
+                $stmt->bind_param(
+                    "ssssssd",
+                    $nim,
+                    $nama,
+                    $jenisKelamin,
+                    $alamat,
+                    $email,
+                    $kota,
+                    $ipkValue
+                );
+
+                if ($stmt->execute()) {
+                    $stmt->close();
+                    $conn->close();
+
+                    header('Location: homeadmin06931.php');
+                    exit();
+                } else {
+                    if ($stmt->errno === 1062) {
+                        $error = 'NIM sudah terdaftar.';
+                    } else {
+                        $error = 'Gagal menambahkan data mahasiswa.';
+                    }
+                }
+
+                $stmt->close();
+            } else {
+                $error = 'Tidak dapat memproses data. Silakan coba lagi.';
+            }
         }
     }
 }
 
 function e($value) {
-    return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+    return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -185,7 +201,10 @@ function e($value) {
         <div class="error"><?php echo e($error); ?></div>
     <?php endif; ?>
 
-    <form method="post" action="<?php echo e($_SERVER['PHP_SELF']); ?>">
+    <form method="post" action="tambahdata06931.php" accept-charset="UTF-8">
+        <input type="hidden" name="csrf_token"
+               value="<?php echo e($_SESSION['csrf_token']); ?>">
+
         <label for="nim">NIM:</label>
         <input type="text" id="nim" name="nim"
                maxlength="15" value="<?php echo e($nim); ?>" required>
