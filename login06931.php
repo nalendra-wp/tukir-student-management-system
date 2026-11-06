@@ -1,29 +1,52 @@
+
 <?php
 session_start();
-require 'validasi06931.php'; 
-require 'config06931.php'; 
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $username = $_POST['username'];
-    $password = $_POST['password'];
+require_once 'validasi06931.php';
+require_once 'config06931.php';
 
-    $sql = "SELECT * FROM admin06931 WHERE username='$username'";
-    $result = $conn->query($sql);
-    $ada = $result->num_rows > 0;
-    if ($ada) {
-        while ($row = $result->fetch_assoc()) {
-            $db_password = $row["password"];
+$error = '';
+
+if (isset($_SESSION['admin06931'])) {
+    header('Location: homeadmin06931.php');
+    exit();
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $username = trim($_POST['username'] ?? '');
+    $password = $_POST['password'] ?? '';
+
+    if ($username === '' || $password === '') {
+        $error = 'Username and password are required.';
+    } else {
+        $sql = "SELECT password FROM admin06931 WHERE username = ? LIMIT 1";
+        $stmt = $conn->prepare($sql);
+
+        if ($stmt) {
+            $stmt->bind_param("s", $username);
+            $stmt->execute();
+            $stmt->bind_result($db_password);
+
+            $ada = $stmt->fetch();
+            $stmt->close();
+
+            if ($ada && validasi($password, $db_password)) {
+                session_regenerate_id(true);
+                $_SESSION['admin06931'] = $username;
+
+                $conn->close();
+
+                header('Location: homeadmin06931.php');
+                exit();
+            } else {
+                $error = 'Invalid username or password.';
+            }
+        } else {
+            $error = 'Unable to process login. Please try again.';
         }
     }
-    $conn->close();
 
-    if ($ada && validasi($password, $db_password)) {
-        $_SESSION['admin06931'] = $username;
-        header('Location: homeadmin06931.php');
-        exit();
-    } else {
-        echo "<p class='error'>Invalid username or password.</p>";
-    }
+    $conn->close();
 }
 ?>
 
@@ -31,7 +54,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login</title>
+
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -39,13 +64,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
-            background-image: url('https://images.pexels.com/photos/1103970/pexels-photo-1103970.jpeg?cs=srgb&dl=pexels-jplenio-1103970.jpg&fm=jpg'); 
-            background-size: cover; 
-            background-position: center; 
-            background-repeat: no-repeat; 
+            background-image: url('https://images.pexels.com/photos/1103970/pexels-photo-1103970.jpeg?cs=srgb&dl=pexels-jplenio-1103970.jpg&fm=jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
         }
+
         .login-container {
             background-color: #fff;
             padding: 20px;
@@ -53,26 +79,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             max-width: 400px;
             width: 100%;
-            box-sizing: border-box; /* tambahkan untuk memastikan padding dihitung dalam lebar */
+            box-sizing: border-box;
+            margin: 20px;
         }
+
         .login-container h1 {
             text-align: center;
             margin-bottom: 20px;
             color: #333;
         }
+
         .login-container label {
             display: block;
             margin-bottom: 5px;
             color: #555;
         }
+
         .login-container input {
-            width: 100%; /* membuat input memenuhi lebar container */
+            width: 100%;
             padding: 10px;
             margin-bottom: 10px;
             border: 1px solid #ddd;
             border-radius: 5px;
-            box-sizing: border-box; /* pastikan padding dihitung dalam lebar */
+            box-sizing: border-box;
         }
+
         .login-container button {
             width: 100%;
             padding: 10px;
@@ -83,9 +114,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             font-size: 16px;
             cursor: pointer;
         }
+
         .login-container button:hover {
             background-color: #0047ab;
         }
+
         .error {
             color: red;
             text-align: center;
@@ -93,14 +126,35 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     </style>
 </head>
+
 <body>
     <div class="login-container">
         <h1>Login</h1>
+
+        <?php if ($error !== ''): ?>
+            <p class="error">
+                <?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?>
+            </p>
+        <?php endif; ?>
+
         <form method="post" action="login06931.php">
             <label for="username">Username:</label>
-            <input type="text" id="username" name="username" required>
+            <input
+                type="text"
+                id="username"
+                name="username"
+                maxlength="50"
+                required
+            >
+
             <label for="password">Password:</label>
-            <input type="password" id="password" name="password" required>
+            <input
+                type="password"
+                id="password"
+                name="password"
+                required
+            >
+
             <button type="submit">Login</button>
         </form>
     </div>
