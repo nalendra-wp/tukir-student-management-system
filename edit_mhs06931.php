@@ -9,75 +9,18 @@ if (!isset($_SESSION['admin06931'])) {
 
 require_once 'config06931.php';
 
-$message = '';
-$nim = '';
-
-function e($value) {
-    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $nim = trim($_POST['Nim'] ?? '');
-    $nama = trim($_POST['nama'] ?? '');
-    $jenis_kelamin = $_POST['jenis_kelamin'] ?? '';
-    $alamat = trim($_POST['alamat'] ?? '');
-    $email = trim($_POST['email'] ?? '');
-    $kota = trim($_POST['kota'] ?? '');
-    $ipk = $_POST['ipk'] ?? '';
+$message = '';
+$nim = trim($_POST['Nim'] ?? $_GET['Nim'] ?? '');
 
-    if (
-        $nim === '' ||
-        $nama === '' ||
-        $alamat === '' ||
-        $kota === '' ||
-        strlen($nim) > 15 ||
-        strlen($nama) > 100 ||
-        strlen($alamat) > 255 ||
-        strlen($email) > 100 ||
-        strlen($kota) > 100 ||
-        !filter_var($email, FILTER_VALIDATE_EMAIL) ||
-        !in_array($jenis_kelamin, ['Laki-laki', 'Perempuan'], true) ||
-        !is_numeric($ipk) ||
-        $ipk < 0 ||
-        $ipk > 4
-    ) {
-        $message = 'Please enter valid student information.';
-    } else {
-        $ipk = (float) $ipk;
+function e($value) {
+    return htmlspecialchars((string) ($value ?? ''), ENT_QUOTES, 'UTF-8');
+}
 
-        $sql = "UPDATE mahasiswa06931
-                SET Nama = ?, JenisKelamin = ?, Alamat = ?,
-                    Email = ?, Kota = ?, IPK = ?
-                WHERE Nim = ?";
-
-        $stmt = $conn->prepare($sql);
-
-        if ($stmt) {
-            $stmt->bind_param(
-                "sssssds",
-                $nama,
-                $jenis_kelamin,
-                $alamat,
-                $email,
-                $kota,
-                $ipk,
-                $nim
-            );
-
-            if ($stmt->execute()) {
-                $message = 'Data berhasil diperbarui.';
-            } else {
-                $message = 'Gagal memperbarui data.';
-            }
-
-            $stmt->close();
-        } else {
-            $message = 'Unable to process the update.';
-        }
-    }
-} elseif (isset($_GET['Nim'])) {
-    $nim = trim($_GET['Nim']);
-} else {
+if ($nim === '' || strlen($nim) > 15) {
     header('Location: homeadmin06931.php');
     exit();
 }
@@ -102,8 +45,101 @@ if (!$result || $result->num_rows === 0) {
 }
 
 $row = $result->fetch_assoc();
-
 $stmt->close();
+
+// Data awal untuk ditampilkan pada form
+$formData = [
+    'Nama' => $row['Nama'] ?? '',
+    'JenisKelamin' => $row['JenisKelamin'] ?? '',
+    'Alamat' => $row['Alamat'] ?? '',
+    'Email' => $row['Email'] ?? '',
+    'Kota' => $row['Kota'] ?? '',
+    'IPK' => $row['IPK'] ?? ''
+];
+
+// Proses update data
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $csrf_token = $_POST['csrf_token'] ?? '';
+
+    if (
+        !isset($_SESSION['csrf_token']) ||
+        !hash_equals($_SESSION['csrf_token'], $csrf_token)
+    ) {
+        $message = 'Invalid request. Please try again.';
+    } else {
+        $nama = trim($_POST['nama'] ?? '');
+        $jenis_kelamin = $_POST['jenis_kelamin'] ?? '';
+        $alamat = trim($_POST['alamat'] ?? '');
+        $email = trim($_POST['email'] ?? '');
+        $kota = trim($_POST['kota'] ?? '');
+        $ipk = trim($_POST['ipk'] ?? '');
+
+        // Pertahankan input jika validasi gagal
+        $formData = [
+            'Nama' => $nama,
+            'JenisKelamin' => $jenis_kelamin,
+            'Alamat' => $alamat,
+            'Email' => $email,
+            'Kota' => $kota,
+            'IPK' => $ipk
+        ];
+
+        if (
+            $nama === '' ||
+            $alamat === '' ||
+            $kota === '' ||
+            strlen($nim) > 15 ||
+            strlen($nama) > 100 ||
+            strlen($alamat) > 255 ||
+            strlen($email) > 100 ||
+            strlen($kota) > 100 ||
+            !filter_var($email, FILTER_VALIDATE_EMAIL) ||
+            !in_array($jenis_kelamin, ['Laki-laki', 'Perempuan'], true) ||
+            !is_numeric($ipk) ||
+            !preg_match('/^\d+(?:\.\d{1,2})?$/', $ipk) ||
+            (float) $ipk < 0 ||
+            (float) $ipk > 4
+        ) {
+            $message = 'Please enter valid student information.';
+        } else {
+            $ipk = (float) $ipk;
+
+            $sql = "UPDATE mahasiswa06931
+                    SET Nama = ?, JenisKelamin = ?, Alamat = ?,
+                        Email = ?, Kota = ?, IPK = ?
+                    WHERE Nim = ?";
+
+            $stmt = $conn->prepare($sql);
+
+            if ($stmt) {
+                $stmt->bind_param(
+                    "sssssds",
+                    $nama,
+                    $jenis_kelamin,
+                    $alamat,
+                    $email,
+                    $kota,
+                    $ipk,
+                    $nim
+                );
+
+                if ($stmt->execute()) {
+                    $message = 'Data berhasil diperbarui.';
+
+                    // Perbarui data form setelah berhasil disimpan
+                    $formData['IPK'] = $ipk;
+                } else {
+                    $message = 'Gagal memperbarui data.';
+                }
+
+                $stmt->close();
+            } else {
+                $message = 'Unable to process the update.';
+            }
+        }
+    }
+}
+
 $conn->close();
 ?>
 
@@ -213,29 +249,32 @@ $conn->close();
 
     <form action="edit_mhs06931.php" method="POST">
 
-        <input type="hidden" name="Nim" value="<?= e($row['Nim']); ?>">
+        <input type="hidden" name="Nim" value="<?= e($nim); ?>">
+
+        <input type="hidden" name="csrf_token"
+               value="<?= e($_SESSION['csrf_token']); ?>">
 
         <label for="nim">NIM:</label>
-        <input type="text" id="nim" value="<?= e($row['Nim']); ?>" readonly>
+        <input type="text" id="nim" value="<?= e($nim); ?>" readonly>
 
         <label for="nama">Nama:</label>
         <input type="text" id="nama" name="nama"
                maxlength="100"
-               value="<?= e($row['Nama']); ?>" required>
+               value="<?= e($formData['Nama']); ?>" required>
 
         <label>Jenis Kelamin:</label>
 
         <div class="jeniskel">
             <input type="radio" id="laki_laki"
                    name="jenis_kelamin" value="Laki-laki"
-                   <?= $row['JenisKelamin'] === 'Laki-laki' ? 'checked' : ''; ?>
+                   <?= $formData['JenisKelamin'] === 'Laki-laki' ? 'checked' : ''; ?>
                    required>
 
             <label class="radio-label" for="laki_laki">Laki-laki</label>
 
             <input type="radio" id="perempuan"
                    name="jenis_kelamin" value="Perempuan"
-                   <?= $row['JenisKelamin'] === 'Perempuan' ? 'checked' : ''; ?>>
+                   <?= $formData['JenisKelamin'] === 'Perempuan' ? 'checked' : ''; ?>>
 
             <label class="radio-label" for="perempuan">Perempuan</label>
         </div>
@@ -243,18 +282,18 @@ $conn->close();
         <label for="alamat">Alamat:</label>
         <input type="text" id="alamat" name="alamat"
                maxlength="255"
-               value="<?= e($row['Alamat']); ?>" required>
+               value="<?= e($formData['Alamat']); ?>" required>
 
         <label for="email">Email:</label>
         <input type="email" id="email" name="email"
                maxlength="100"
-               value="<?= e($row['Email']); ?>" required>
+               value="<?= e($formData['Email']); ?>" required>
 
         <label for="kota">Kota:</label>
         <select id="kota" name="kota" required>
             <?php
             $cities = array_unique([
-                $row['Kota'],
+                $formData['Kota'],
                 'Semarang',
                 'Jepara',
                 'Salatiga',
@@ -267,7 +306,7 @@ $conn->close();
             foreach ($cities as $city):
             ?>
                 <option value="<?= e($city); ?>"
-                    <?= $row['Kota'] === $city ? 'selected' : ''; ?>>
+                    <?= $formData['Kota'] === $city ? 'selected' : ''; ?>>
                     <?= e($city); ?>
                 </option>
             <?php endforeach; ?>
@@ -275,7 +314,7 @@ $conn->close();
 
         <label for="ipk">IPK:</label>
         <input type="number" id="ipk" name="ipk"
-               value="<?= e($row['IPK']); ?>"
+               value="<?= e($formData['IPK']); ?>"
                min="0" max="4" step="0.01" required>
 
         <button type="submit" class="submit-btn">
